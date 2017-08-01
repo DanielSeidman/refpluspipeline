@@ -18,10 +18,10 @@ import net.sf.picard.reference.ReferenceSequence;
 
 
 public class ReferenceSimulation {
-	
+
 	public static Hashtable<String, Integer> fetchChromosomeLengths(String filename) throws IOException {
 		Hashtable<String, Integer> out = new Hashtable<String, Integer>();
-		
+
 		BufferedReader in = new BufferedReader(new FileReader(filename));
 		String line;
 		while ( (line = in.readLine()) != null) {
@@ -33,10 +33,10 @@ public class ReferenceSimulation {
 		in.close();
 		return out;
 	}
-	
+
 	private static ArrayList<String> fetchSequenceNames(String filename) throws IOException {
 		ArrayList<String> out = new ArrayList<String>();
-		
+
 		BufferedReader in = new BufferedReader(new FileReader(filename));
 		String line;
 		while ( (line = in.readLine()) != null) {
@@ -44,11 +44,11 @@ public class ReferenceSimulation {
 			String n = t.nextToken();
 			out.add(n);
 		}
-		
+
 		in.close();
 		return out;
 	}
-	
+
 	public static String reverseComplement(String sequence) {
 		StringBuilder rcSequence = new StringBuilder();
 		for ( int i=sequence.length()-1; i>=0; --i ) {
@@ -72,40 +72,40 @@ public class ReferenceSimulation {
 
 	/**
 	 * @param args
-	 * @throws IOException 
+	 * @throws IOException
 	 */
 	public static void main1(String[] args) throws IOException {
-		
+
 		if(args.length < 3){
 			System.err.println("Usage: <reference sequence> <target chromosome> <variation file>");
 			System.exit(0);
 		}
-		
+
 		String filename = args[0];
 //		String filename = "/Users/schroeder/Documents/workspace/references/mm10_pUC12_karyotipic.fa";
 		FastaSequenceIndex index = new FastaSequenceIndex(new File(filename+".fai"));
-		
+
 		IndexedFastaSequenceFile reference = new IndexedFastaSequenceFile(new File(filename), index);
-		
+
 		if(! reference.isIndexed()){
 			System.err.println("Input reference is not indexed. Abort.");
 			System.exit(1);
 		}
-		
+
 //		String variationsFile = "examples/variations.bed";
 		String variationsFile = args[2];
 		BufferedReader inputVariations = new BufferedReader(new FileReader(variationsFile));
-		
+
 //		FileWriter out = new FileWriter("examples/out.fa");
 		FileWriter out = new FileWriter(variationsFile + "_reference.fa");
-		
+
 		ArrayList<Variation> vars = new ArrayList<Variation>();
 		String line;
 		while(( line = inputVariations.readLine()) != null){
 			vars.add(new Variation(line));
 		}
 		inputVariations.close();
-		
+
 //		Variation var = new Variation(Variation.TYPE.SNP, "A", new GenomicInterval("gi|310821|gb|L09129.1|SYNPUC12V", new Interval(2, 2)));
 //		vars.add(var);
 //		var = new Variation(Variation.TYPE.DELETION, null, new GenomicInterval("gi|310821|gb|L09129.1|SYNPUC12V", new Interval(10,19)));
@@ -115,28 +115,28 @@ public class ReferenceSimulation {
 		int lastLocation = 1;
 		int newRefLocation = 1;
 		String chromosome = args[1];
-		
+
 		out.write(">"+chromosome+"\n");
-		
+
 		FileWriter offsets = new FileWriter("offsets.txt");
-		
+
 		for(Variation v: vars){
 			String seq = new String(reference.getSubsequenceAt(chromosome, lastLocation, v.getLocation().start-1).getBases());
 			newRefLocation += seq.length();
 			out.write(seq);
 
 			switch(v.getType()){
-			case DELETION: 
+			case DELETION:
 				lastLocation = v.getLocation().end+1;
 				System.out.println("DELETION\t"+chromosome+":"+newRefLocation+"-"+newRefLocation);
 				break;
-			case INSERTION: 
+			case INSERTION:
 			case TRANSLOCATION:
 				GenomicInterval insert = v.parseSequenceAsInterval();
 				String insertion;
 				if (insert != null){
 					insertion = new String(reference.getSubsequenceAt(insert.chrom, insert.start, insert.end).getBases());
-				} else 
+				} else
 					insertion = v.getSequence();
 				out.write(insertion);
 				System.out.println(v.getType()+"\t"+chromosome+":"+newRefLocation+"-"+(newRefLocation+insertion.length()));
@@ -159,21 +159,21 @@ public class ReferenceSimulation {
 			}
 			offsets.write(newRefLocation+"\t"+(newRefLocation- lastLocation)+"\n");
 		}
-		
-		
-		
-		
+
+
+
+
 		Hashtable<String, Integer> chrLens = fetchChromosomeLengths(filename+".fai");
-		
+
 		int len = chrLens.get(chromosome);
-		
+
 		String r = new String(reference.getSubsequenceAt(chromosome, lastLocation, len).getBases());
-		
+
 		out.write(r);
-		
+
 		out.flush();
 		out.close();
-		
+
 		offsets.flush();
 		offsets.close();
 	}
@@ -204,7 +204,7 @@ public class ReferenceSimulation {
 		FileWriter out = new FileWriter(variationsFile + "_reference.fa");
 		FileWriter offsets = new FileWriter(variationsFile + "_offsets.txt");
 		FileWriter breakpoints = new FileWriter(variationsFile + "_breakpoints.txt");
-		
+
 		ArrayList<String> chromosomes = fetchSequenceNames(filename+".fai");
 		Hashtable<String, Integer> chrLens = fetchChromosomeLengths(filename+".fai");
 
@@ -221,31 +221,33 @@ public class ReferenceSimulation {
 		inputVariations.close();
 
 
-		
+
 
 		for(String chromosome: chromosomes){
 			int lastLocation = 1;
 			int newRefLocation = 1;
-			
+
 
 			out.write(">"+chromosome+"\n");
 			ArrayList<Variation> l = vars.get(chromosome);
-			
+
 			for(Variation v: l){
+                if(lastLocation>v.getLocation().start-1) {
+                    continue;
+                }
 				String seq = new String(reference.getSubsequenceAt(chromosome, lastLocation, v.getLocation().start-1).getBases());
 				out.write(seq);
 				newRefLocation += seq.length();
-				
+
 				switch(v.getType()){
-				case DELETION: 
-				case TRANSLOCATION_DELETION:
+				case DELETION:
 					lastLocation = v.getLocation().end+1;
-					System.out.println(v.getType()+"\t"+chromosome+":"+newRefLocation+"-"+newRefLocation);
+					System.out.println("DELETION\t"+chromosome+":"+newRefLocation+"-"+newRefLocation);
 					offsets.write(chromosome+"\t"+newRefLocation+"\t"+(newRefLocation - lastLocation)+"\n");
 					breakpoints.write((v.getLocation().start-1)+"\t"+(v.getLocation().end+1)+"\n");
 					break;
 				case TANDEM:
-					seq = new String(reference.getSubsequenceAt(chromosome, v.getLocation().start, v.getLocation().end).getBases());
+					seq = new String(reference.getSubsequenceAt(chromosome, v.getLocation().start, v.getLocation().end-1).getBases());
 					out.write(seq);
 					out.write(seq);
 					newRefLocation += 2*seq.length();
@@ -253,29 +255,12 @@ public class ReferenceSimulation {
 					offsets.write(chromosome+"\t"+newRefLocation+"\t"+(newRefLocation - lastLocation)+"\n");
 					breakpoints.write((v.getLocation().start)+"\t"+(v.getLocation().end)+"\n");
 					break;
-				case INSERTION: 
+				case INSERTION:
 				case TRANSLOCATION:
-				case DUPLICATION:
-				case INVERTED_TRANSLOCATION:
-				case INVERTED_DUPLICATION:
-				case INTERCHROMOSOMAL_TRANSLOCATION:
-				case INTERCHROMOSOMAL_DUPLICATION:
-				case INTERCHROMOSOMAL_INVERTED_TRANSLOCATION:
-				case INTERCHROMOSOMAL_INVERTED_DUPLICATION:
 					GenomicInterval insert = v.parseSequenceAsInterval();
-					String insertion = null;
+					String insertion;
 					if (insert != null){
-						if(v.getType() == Variation.TYPE.INVERTED_DUPLICATION || v.getType() == Variation.TYPE.INVERTED_TRANSLOCATION
-							|| v.getType() == Variation.TYPE.INTERCHROMOSOMAL_INVERTED_DUPLICATION 
-							|| v.getType() == Variation.TYPE.INTERCHROMOSOMAL_INVERTED_TRANSLOCATION) {
-							try{
-								insertion = reverseComplement(new String(reference.getSubsequenceAt(insert.chrom, insert.start, insert.end).getBases()));
-							} catch(Exception e){
-								System.out.println(e);
-								System.exit(0);
-							}
-						} else
-							insertion = new String(reference.getSubsequenceAt(insert.chrom, insert.start, insert.end).getBases());
+						insertion = new String(reference.getSubsequenceAt(insert.chrom, insert.start, insert.end).getBases());
 					} else
 						insertion = v.getSequence();
 					out.write(insertion);
